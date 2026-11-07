@@ -27,7 +27,7 @@
 
 import { WorkPackageResource } from 'core-app/features/hal/resources/work-package-resource';
 import { PathHelperService } from 'core-app/core/path-helper/path-helper.service';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, Input, OnInit, ViewChild, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, Input, Injector, OnChanges, SimpleChanges, ViewChild, afterNextRender, inject } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
 import { HalEventsService } from 'core-app/features/hal/services/hal-events.service';
 import { WorkPackageNotificationService } from 'core-app/features/work-packages/services/notifications/work-package-notification.service';
@@ -37,6 +37,7 @@ import { RelationResource } from 'core-app/features/hal/resources/relation-resou
 import { WorkPackageRelationsService } from '../wp-relations.service';
 import { Highlighting } from 'core-app/features/work-packages/components/wp-fast-table/builders/highlighting/highlighting.functions';
 import { ProjectResource } from 'core-app/features/hal/resources/project-resource';
+import { Subscription } from 'rxjs';
 
 
 @Component({
@@ -44,12 +45,9 @@ import { ProjectResource } from 'core-app/features/hal/resources/project-resourc
   selector: 'wp-relation-row',
   templateUrl: './wp-relation-row.template.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkPackageRelationRowComponent extends UntilDestroyedMixin implements OnInit {
+export class WorkPackageRelationRowComponent extends UntilDestroyedMixin implements OnChanges {
   protected apiV3Service = inject(ApiV3Service);
   protected notificationService = inject(WorkPackageNotificationService);
   protected wpRelations = inject(WorkPackageRelationsService);
@@ -57,6 +55,9 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
   protected I18n = inject(I18nService);
   protected cdRef = inject(ChangeDetectorRef);
   protected PathHelper = inject(PathHelperService);
+
+  private readonly injector = inject(Injector);
+  private relatedWorkPackageSubscription?:Subscription;
 
   @Input() public workPackage:WorkPackageResource;
 
@@ -72,7 +73,7 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
 
   public showEditForm = false;
 
-  public availableRelationTypes:{ label:string, name:string }[];
+  public availableRelationTypes = RelationResource.LOCALIZED_RELATION_TYPES(false);
 
   public selectedRelationType:{ name:string };
 
@@ -104,14 +105,36 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
     },
   };
 
-  ngOnInit() {
-    this.relation = this.relatedWorkPackage.relatedBy!;
+  ngOnChanges(changes:SimpleChanges<WorkPackageRelationRowComponent>):void {
+    const relatedWorkPackageChanged = changes.relatedWorkPackage !== undefined
+      && changes.relatedWorkPackage.previousValue?.id !== this.relatedWorkPackage.id;
+    const previousRelation = this.relation;
+    if (changes.relatedWorkPackage && this.relatedWorkPackage.relatedBy) {
+      this.relation = this.relatedWorkPackage.relatedBy;
+    }
 
-    this.userInputs.newRelationText = this.relation.description || '';
-    this.availableRelationTypes = RelationResource.LOCALIZED_RELATION_TYPES(false);
-    this.selectedRelationType = this.availableRelationTypes.find((relationType) => relationType.name === this.relation.normalizedType(this.workPackage))!;
+    if (changes.relatedWorkPackage || changes.workPackage) {
+      const workPackageChanged = changes.workPackage !== undefined
+        && changes.workPackage.previousValue?.id !== this.workPackage.id;
+      const rowChanged = relatedWorkPackageChanged || workPackageChanged
+        || this.relationIdentity(previousRelation) !== this.relationIdentity(this.relation);
 
-    this
+      if (rowChanged || !this.userInputs.showDescriptionEditForm) {
+        this.cancelDescriptionEdit();
+      }
+
+      if (rowChanged || !this.userInputs.showRelationTypesForm) {
+        this.selectedRelationType = this.availableRelationTypes.find((relationType) => relationType.name === this.relation.normalizedType(this.workPackage))!;
+        this.userInputs.showRelationTypesForm = false;
+      }
+    }
+
+    if (!relatedWorkPackageChanged) {
+      return;
+    }
+
+    this.relatedWorkPackageSubscription?.unsubscribe();
+    this.relatedWorkPackageSubscription = this
       .apiV3Service
       .work_packages
       .id(this.relatedWorkPackage)
@@ -139,15 +162,16 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
 
   public startDescriptionEdit() {
     this.userInputs.showDescriptionEditForm = true;
-    setTimeout(() => {
-      const textarea = this.relationDescriptionTextarea.nativeElement;
-      const textlen = textarea.value.length;
-      // Focus and set cursor to end
-      textarea.focus();
-
-      textarea.selectionStart = textlen;
-      textarea.selectionEnd = textlen;
-    });
+    afterNextRender({
+      write: () => {
+        const textarea = this.relationDescriptionTextarea?.nativeElement;
+        if (textarea) {
+          const textEnd = textarea.value.length;
+          textarea.focus();
+          textarea.setSelectionRange(textEnd, textEnd);
+        }
+      },
+    }, { injector: this.injector });
   }
 
   public handleDescriptionKey(event:KeyboardEvent) {
@@ -158,20 +182,18 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
 
   public cancelDescriptionEdit() {
     this.userInputs.showDescriptionEditForm = false;
-    this.userInputs.newRelationText = this.relation.description || '';
+    this.userInputs.newRelationText = this.relation.description ?? '';
   }
 
   public saveDescription() {
-    this.wpRelations.updateRelation(
-      this.relation,
-      { description: this.userInputs.newRelationText },
-    )
-      .then((savedRelation:RelationResource) => {
-        this.relation = savedRelation;
-        this.relatedWorkPackage.relatedBy = savedRelation;
-        this.userInputs.showDescriptionEditForm = false;
-        this.notificationService.showSave(this.relatedWorkPackage);
-        this.cdRef.detectChanges();
+    const { workPackage, relatedWorkPackage, relation } = this;
+    void this.wpRelations.updateRelation(relation, { description: this.userInputs.newRelationText })
+      .then((savedRelation) => {
+        if (this.applySavedRelation(workPackage, relatedWorkPackage, relation, savedRelation)) {
+          this.userInputs.showDescriptionEditForm = false;
+          this.cdRef.markForCheck();
+        }
+        this.notificationService.showSave(relatedWorkPackage);
       });
   }
 
@@ -190,21 +212,43 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
   }
 
   public saveRelationType() {
-    this.wpRelations.updateRelationType(
-      this.workPackage,
-      this.relatedWorkPackage,
-      this.relation,
-      this.selectedRelationType.name,
-    )
-      .then((savedRelation:RelationResource) => {
-        this.notificationService.showSave(this.relatedWorkPackage);
-        this.relatedWorkPackage.relatedBy = savedRelation;
-        this.relation = savedRelation;
-
-        this.userInputs.showRelationTypesForm = false;
-        this.cdRef.detectChanges();
+    const { workPackage, relatedWorkPackage, relation } = this;
+    this.wpRelations.updateRelationType(workPackage, relatedWorkPackage, relation, this.selectedRelationType.name)
+      .then((savedRelation) => {
+        this.notificationService.showSave(relatedWorkPackage);
+        if (this.applySavedRelation(workPackage, relatedWorkPackage, relation, savedRelation)) {
+          this.userInputs.showRelationTypesForm = false;
+          this.cdRef.markForCheck();
+        }
       })
-      .catch((error:unknown) => this.notificationService.handleRawError(error, this.workPackage));
+      .catch((error:unknown) => this.notificationService.handleRawError(error, workPackage));
+  }
+
+  private applySavedRelation(
+    workPackage:WorkPackageResource,
+    relatedWorkPackage:WorkPackageResource,
+    original:RelationResource,
+    saved:RelationResource,
+  ):boolean {
+    const relationIdentity = this.relationIdentity(original);
+    const isCurrent = this.workPackage.id === workPackage.id
+      && this.relatedWorkPackage.id === relatedWorkPackage.id
+      && this.relationIdentity(this.relation) === relationIdentity;
+
+    if (!isCurrent) {
+      if (this.relationIdentity(relatedWorkPackage.relatedBy) === relationIdentity) {
+        relatedWorkPackage.relatedBy = saved;
+      }
+      return false;
+    }
+
+    this.relatedWorkPackage.relatedBy = saved;
+    this.relation = saved;
+    return true;
+  }
+
+  private relationIdentity(relation:RelationResource|null|undefined) {
+    return relation?.href ?? relation;
   }
 
   public toggleUserDescriptionForm() {
@@ -212,26 +256,24 @@ export class WorkPackageRelationRowComponent extends UntilDestroyedMixin impleme
   }
 
   public removeRelation() {
-    this.wpRelations.removeRelation(this.relation)
+    const { workPackage, relatedWorkPackage, relation } = this;
+    this.wpRelations.removeRelation(relation)
       .then(() => {
-        this.halEvents.push(this.workPackage, {
+        this.halEvents.push(workPackage, {
           eventType: 'association',
           relatedWorkPackage: null,
-          relationType: this.relation.normalizedType(this.workPackage),
+          relationType: relation.normalizedType(workPackage),
         });
 
-        this
-          .apiV3Service
-          .work_packages
-          .cache
-          .updateWorkPackage(this.relatedWorkPackage);
+        const currentRelatedWorkPackage = this.relatedWorkPackage.id === relatedWorkPackage.id
+          ? this.relatedWorkPackage
+          : relatedWorkPackage;
+        void this.apiV3Service.work_packages.cache.updateWorkPackage(currentRelatedWorkPackage);
 
-        this.wpRelations.updateCounter(this.workPackage);
-
-        this.notificationService.showSave(this.relatedWorkPackage);
+        this.wpRelations.updateCounter(workPackage);
+        this.notificationService.showSave(relatedWorkPackage);
       })
-      .catch((err:unknown) => this.notificationService.handleRawError(err,
-        this.relatedWorkPackage));
+      .catch((err:unknown) => this.notificationService.handleRawError(err, relatedWorkPackage));
   }
 
   public highlightingClassForWpType():string {

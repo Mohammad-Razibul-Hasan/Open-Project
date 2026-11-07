@@ -33,10 +33,7 @@ import { CreateAutocompleterComponent } from 'core-app/shared/components/autocom
   // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'wp-autocompleter',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkPackageAutocompleterComponent extends CreateAutocompleterComponent implements AfterViewInit {
 }

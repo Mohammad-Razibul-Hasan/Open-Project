@@ -25,17 +25,17 @@
 // See COPYRIGHT and LICENSE files for more details.
 //++
 
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
 import { WorkPackageResource } from 'core-app/features/hal/resources/work-package-resource';
 import { PathHelperService } from 'core-app/core/path-helper/path-helper.service';
-import { withLatestFrom } from 'rxjs/operators';
+import { Subscription, map, switchMap } from 'rxjs';
 import { UntilDestroyedMixin } from 'core-app/shared/helpers/angular/until-destroyed.mixin';
 import { ApiV3Service } from 'core-app/core/apiv3/api-v3.service';
 import {
   WorkPackageIsolatedQuerySpaceDirective,
 } from 'core-app/features/work-packages/directives/query-space/wp-isolated-query-space.directive';
-import { SchemaCacheService } from 'core-app/core/schemas/schema-cache.service';
+import { SchemaCacheService, fallbackSchemaId } from 'core-app/core/schemas/schema-cache.service';
 
 @Component({
   // eslint-disable-next-line @angular-eslint/component-selector
@@ -43,17 +43,16 @@ import { SchemaCacheService } from 'core-app/core/schemas/schema-cache.service';
   templateUrl: './wp-relations-hierarchy.template.html',
   hostDirectives: [WorkPackageIsolatedQuerySpaceDirective],
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkPackageRelationsHierarchyComponent extends UntilDestroyedMixin implements OnInit {
+export class WorkPackageRelationsHierarchyComponent extends UntilDestroyedMixin implements OnChanges {
   readonly apiV3Service = inject(ApiV3Service);
   readonly PathHelper = inject(PathHelperService);
   readonly I18n = inject(I18nService);
   readonly schemaCache = inject(SchemaCacheService);
   readonly cdRef = inject(ChangeDetectorRef);
+
+  private workPackageSubscription?:Subscription;
 
   @Input() public workPackage:WorkPackageResource;
 
@@ -76,32 +75,46 @@ export class WorkPackageRelationsHierarchyComponent extends UntilDestroyedMixin 
     childrenHeadline: this.I18n.t('js.relations_hierarchy.children_headline'),
   };
 
-  ngOnInit() {
-    this.workPackagePath = this.PathHelper.workPackagePath(this.workPackage.displayId);
-    this.canModifyHierarchy = !!this.workPackage.changeParent;
-    this.canAddRelation = !!this.workPackage.addRelation;
+  ngOnChanges(changes:SimpleChanges<WorkPackageRelationsHierarchyComponent>):void {
+    if (!changes.workPackage) {
+      return;
+    }
 
+    this.updateWorkPackageDetails();
+    if (changes.workPackage.previousValue?.id === this.workPackage.id) {
+      return;
+    }
+
+    this.canHaveChildren = false;
     this.childrenQueryProps = {
       filters: JSON.stringify([{ parent: { operator: '=', values: [this.workPackage.id] } }]),
       'columns[]': ['id', 'type', 'subject', 'status'],
       showHierarchies: false,
     };
 
-    this
+    this.workPackageSubscription?.unsubscribe();
+    this.workPackageSubscription = this
       .apiV3Service
       .work_packages
       .id(this.workPackage)
       .requireAndStream()
       .pipe(
-        withLatestFrom(this.schemaCache.requireAndStream(this.schemaCache.getSchemaHref(this.workPackage)!)),
+        switchMap((wp) => this.schemaCache
+          .requireAndStream(this.schemaCache.getSchemaHref(wp) ?? fallbackSchemaId)
+          .pipe(map((schema) => ({ wp, schema })))),
         this.untilDestroyed(),
       )
-      .subscribe(([wp, _]) => {
-        const milestone = this.schemaCache.of(wp).isMilestone as boolean;
+      .subscribe(({ wp, schema }) => {
         this.workPackage = wp;
-        this.canHaveChildren = !milestone;
-
-        this.cdRef.detectChanges();
+        this.updateWorkPackageDetails();
+        this.canHaveChildren = !this.schemaCache.proxied(wp, schema).isMilestone;
+        this.cdRef.markForCheck();
       });
+  }
+
+  private updateWorkPackageDetails():void {
+    this.workPackagePath = this.PathHelper.workPackagePath(this.workPackage.displayId);
+    this.canModifyHierarchy = !!this.workPackage.changeParent;
+    this.canAddRelation = !!this.workPackage.addRelation;
   }
 }

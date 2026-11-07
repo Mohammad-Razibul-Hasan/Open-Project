@@ -43,10 +43,7 @@ import { ID } from '@datorama/akita';
 @Component({
   templateUrl: '../op-autocompleter/op-autocompleter.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MembersAutocompleterComponent extends UserAutocompleterComponent implements OnInit {
   @Input() principalType?:PrincipalType;
@@ -63,6 +60,7 @@ export class MembersAutocompleterComponent extends UserAutocompleterComponent im
       this
         .currentUser
         .hasCapabilities$('placeholder_users/create', 'global')
+        .pipe(this.untilDestroyed())
         .subscribe((canCreate) => {
           if (canCreate) {
             this.addTag = this.createPlaceholderUser.bind(this);

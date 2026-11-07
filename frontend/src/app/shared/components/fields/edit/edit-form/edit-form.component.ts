@@ -48,10 +48,7 @@ import { firstValueFrom } from 'rxjs';
   selector: 'edit-form,[edit-form]',
   template: '<ng-content />',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditFormComponent extends EditForm<HalResource> implements OnInit, OnDestroy {
   readonly injector:Injector;
@@ -111,6 +108,7 @@ export class EditFormComponent extends EditForm<HalResource> implements OnInit, 
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- The field can register after reset is requested.
   public async reset(fieldName:string, focus = false) {
     const ctrl = await this.waitForField(fieldName);
     ctrl.reset();
@@ -155,7 +153,7 @@ export class EditFormComponent extends EditForm<HalResource> implements OnInit, 
     const shouldActivate = (this.editMode && !this.skipField(field) || this.activeFields[field.fieldName]);
 
     if (shouldActivate) {
-      field.activateOnForm(true);
+      void field.activateOnForm(true);
     }
   }
 

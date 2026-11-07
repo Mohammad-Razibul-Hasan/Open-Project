@@ -26,7 +26,7 @@
 //++
 
 import { WorkPackageResource } from 'core-app/features/hal/resources/work-package-resource';
-import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostBinding, Input, Output, ViewChild, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostBinding, Input, Injector, Output, ViewChild, afterNextRender, inject } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
 
 @Component({
@@ -34,13 +34,11 @@ import { I18nService } from 'core-app/core/i18n/i18n.service';
   selector: 'wp-relations-group',
   templateUrl: './wp-relations-group.template.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkPackageRelationsGroupComponent {
   readonly I18n = inject(I18nService);
+  private readonly injector = inject(Injector);
 
   @HostBinding('class.attributes-group') className = true;
 
@@ -72,10 +70,9 @@ export class WorkPackageRelationsGroupComponent {
   }
 
   public toggleButton() {
+    afterNextRender({
+      write: () => this.toggleElement?.nativeElement.focus(),
+    }, { injector: this.injector });
     this.onToggleGroupBy.emit();
-
-    setTimeout(() => {
-      this.toggleElement.nativeElement.focus();
-    }, 20);
   }
 }

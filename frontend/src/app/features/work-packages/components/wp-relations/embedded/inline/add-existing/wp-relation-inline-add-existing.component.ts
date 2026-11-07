@@ -25,7 +25,7 @@
 // See COPYRIGHT and LICENSE files for more details.
 //++
 
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
 import {
   WorkPackageInlineCreateService,
@@ -54,10 +54,7 @@ import { FilterOperator } from 'core-app/shared/helpers/api-v3/api-v3-filter-bui
 @Component({
   templateUrl: './wp-relation-inline-add-existing.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WpRelationInlineAddExistingComponent {
   protected readonly parent = inject(WorkPackageInlineCreateComponent);
@@ -69,6 +66,8 @@ export class WpRelationInlineAddExistingComponent {
   protected urlParamsHelper = inject(UrlParamsHelperService);
   protected querySpace = inject(IsolatedQuerySpace);
   protected readonly I18n = inject(I18nService);
+
+  private readonly destroyRef = inject(DestroyRef);
 
   public selectedWpId:string;
 
@@ -86,30 +85,38 @@ export class WpRelationInlineAddExistingComponent {
     }
 
     const newRelationId = this.selectedWpId;
+    const { workPackage, relationType } = this;
+    const isCurrent = () => !this.destroyRef.destroyed
+      && this.wpInlineCreate.referenceTarget?.id === workPackage.id
+      && this.relationType === relationType;
+
     this.isDisabled = true;
 
-    this.wpInlineCreate.add(this.workPackage, newRelationId)
+    void this.wpInlineCreate.add(workPackage, newRelationId)
       .then(() => {
         void this
           .apiV3Service
           .work_packages
-          .id(this.workPackage)
+          .id(workPackage)
           .refresh();
 
-        this.halEvents.push(this.workPackage, {
+        this.halEvents.push(workPackage, {
           eventType: 'association',
           relatedWorkPackage: newRelationId,
-          relationType: this.relationType,
+          relationType,
         });
 
         this.isDisabled = false;
-        this.wpInlineCreate.newInlineWorkPackageReferenced.next(newRelationId);
-        this.cancel();
+        if (isCurrent()) {
+          this.wpInlineCreate.newInlineWorkPackageReferenced.next(newRelationId);
+        }
       })
-      .catch((err:unknown) => {
-        this.notificationService.handleRawError(err, this.workPackage);
+      .catch((err:unknown) => this.notificationService.handleRawError(err, workPackage))
+      .finally(() => {
         this.isDisabled = false;
-        this.cancel();
+        if (isCurrent()) {
+          this.cancel();
+        }
       });
   }
 

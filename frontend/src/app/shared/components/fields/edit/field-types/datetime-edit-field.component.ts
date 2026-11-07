@@ -42,10 +42,7 @@ import { EditFieldComponent } from 'core-app/shared/components/fields/edit/edit-
      />
   `,
   standalone: false,
-  // TODO: Switch to OnPush once EditFieldComponent marks itself for check on handler.stateChanged$.
-  // Until then, an OnPush field stays disabled after a failed save, as only the portal re-renders.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DateTimeEditFieldComponent extends EditFieldComponent implements OnInit {
   autofocus = false;

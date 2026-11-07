@@ -25,7 +25,7 @@
 // See COPYRIGHT and LICENSE files for more details.
 //++
 
-import { ChangeDetectionStrategy, Component, Input, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnInit, SimpleChanges, inject } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
 import { PathHelperService } from 'core-app/core/path-helper/path-helper.service';
 import { WorkPackageResource } from 'core-app/features/hal/resources/work-package-resource';
@@ -35,6 +35,7 @@ import { OpTableActionFactory } from 'core-app/features/work-packages/components
 import { WorkPackageInlineCreateService } from 'core-app/features/work-packages/components/wp-inline-create/wp-inline-create.service';
 import { WorkPackageRelationQueryBase } from 'core-app/features/work-packages/components/wp-relations/embedded/wp-relation-query.base';
 import { WpChildrenInlineCreateService } from 'core-app/features/work-packages/components/wp-relations/embedded/children/wp-children-inline-create.service';
+import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { QueryResource } from 'core-app/features/hal/resources/query-resource';
 import { HalEventsService } from 'core-app/features/hal/services/hal-events.service';
@@ -51,10 +52,7 @@ import { WorkPackageRelationsService } from 'core-app/features/work-packages/com
     { provide: WorkPackageInlineCreateService, useClass: WpChildrenInlineCreateService },
   ],
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkPackageChildrenQueryComponent extends WorkPackageRelationQueryBase implements OnInit {
   protected wpRelationsHierarchyService = inject(WorkPackageRelationsHierarchyService);
@@ -67,12 +65,14 @@ export class WorkPackageChildrenQueryComponent extends WorkPackageRelationQueryB
 
   @Input() public workPackage:WorkPackageResource;
 
-  @Input() public query:QueryResource;
+  @Input() public query:QueryResource|object;
 
   /** An optional group descriptor if we're rendering on the single view */
   @Input() public group?:GroupDescriptor;
 
   @Input() public addExistingChildEnabled = false;
+
+  private workPackageSubscription?:Subscription;
 
   public idFromLink = idFromLink;
 
@@ -89,13 +89,7 @@ export class WorkPackageChildrenQueryComponent extends WorkPackageRelationQueryB
     ),
   ];
 
-  ngOnInit() {
-    // Set reference target and reference class
-    this.wpInlineCreate.referenceTarget = this.workPackage;
-
-    // Set up the query props
-    this.queryProps = this.buildQueryProps();
-
+  ngOnInit():void {
     // Fire event that children were added
     this.wpInlineCreate.newInlineWorkPackageCreated
       .pipe(
@@ -108,9 +102,22 @@ export class WorkPackageChildrenQueryComponent extends WorkPackageRelationQueryB
           relationType: 'child',
         });
       });
+  }
 
-    // Refresh table when work package is refreshed
-    this
+  override ngOnChanges(changes:SimpleChanges<WorkPackageChildrenQueryComponent>):void {
+    super.ngOnChanges(changes);
+
+    if (!changes.workPackage) {
+      return;
+    }
+
+    this.wpInlineCreate.referenceTarget = this.workPackage;
+    if (changes.workPackage.previousValue?.id === this.workPackage.id) {
+      return;
+    }
+
+    this.workPackageSubscription?.unsubscribe();
+    this.workPackageSubscription = this
       .apiV3Service
       .work_packages
       .id(this.workPackage)
