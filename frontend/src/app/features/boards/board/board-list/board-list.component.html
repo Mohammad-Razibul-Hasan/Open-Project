@@ -58,6 +58,7 @@
         [highlightingMode]="board.highlightingMode"
         [showStatusButton]="showCardStatusButton()"
         (itemClicked)="openFullViewOnDoubleClick($event)"
+        (orderSaveFailed)="updateQuery(true)"
         (stateLinkClicked)="openStateLink($event)" />
     </div>
   }
