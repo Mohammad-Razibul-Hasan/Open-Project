@@ -38,14 +38,14 @@ import { QueryFilterInstanceResource } from 'core-app/features/hal/resources/que
   selector: 'op-filter-dates-value',
   templateUrl: './filter-dates-value.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FilterDatesValueComponent extends UntilDestroyedMixin {
   readonly timezoneService = inject(TimezoneService);
   readonly I18n = inject(I18nService);
+
+  private rangeSource:string[]|undefined;
+  private rangeSnapshot:string[] = [];
 
   @HostBinding('id') get id() {
     return `div-values-${this.filter.id}`;
@@ -70,6 +70,18 @@ export class FilterDatesValueComponent extends UntilDestroyedMixin {
   public set value(val:string[]) {
     this.filter.values = val;
     this.filterChanged.emit(this.filter);
+  }
+
+  protected get pickerValue():string[] {
+    const dates = this.filter.values as string[]|undefined;
+    if (dates !== this.rangeSource
+      || (dates?.length ?? 0) !== this.rangeSnapshot.length
+      || this.rangeSnapshot.some((date, index) => date !== dates?.[index])) {
+      this.rangeSource = dates;
+      this.rangeSnapshot = dates?.slice() ?? [];
+    }
+
+    return this.rangeSnapshot;
   }
 
   public get begin():string {

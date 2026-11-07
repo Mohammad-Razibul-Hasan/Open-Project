@@ -40,10 +40,7 @@ import { SchemaCacheService } from 'core-app/core/schemas/schema-cache.service';
   // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'wp-table-configuration-relation-selector',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WpTableConfigurationRelationSelectorComponent implements OnInit {
   readonly injector = inject(Injector);

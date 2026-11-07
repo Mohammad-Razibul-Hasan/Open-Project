@@ -38,10 +38,7 @@ import moment from 'moment-timezone';
   selector: 'op-filter-date-value',
   templateUrl: './filter-date-value.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FilterDateValueComponent extends UntilDestroyedMixin {
   readonly timezoneService = inject(TimezoneService);

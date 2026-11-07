@@ -41,10 +41,7 @@ import { Board } from 'core-app/features/boards/board/board';
 @Component({
   templateUrl: './board-configuration.modal.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardConfigurationModalComponent extends OpModalComponent implements OnInit, OnDestroy {
   readonly I18n = inject(I18nService);
@@ -67,6 +64,8 @@ export class BoardConfigurationModalComponent extends OpModalComponent implement
   // And a reference to the actual portal host interface
   public tabPortalHost:TabPortalOutlet;
 
+  private initialTabTimer:ReturnType<typeof setTimeout>;
+
   ngOnInit() {
     this.element = this.elementRef.nativeElement;
 
@@ -77,13 +76,14 @@ export class BoardConfigurationModalComponent extends OpModalComponent implement
       this.injector,
     );
 
-    setTimeout(() => {
+    this.initialTabTimer = setTimeout(() => {
       const initialTab = this.availableTabs[0];
       this.switchTo(initialTab);
     });
   }
 
   ngOnDestroy() {
+    clearTimeout(this.initialTabTimer);
     this.tabPortalHost.dispose();
   }
 
