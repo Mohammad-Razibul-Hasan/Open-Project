@@ -38,10 +38,7 @@ import { QueryGroupByResource } from 'core-app/features/hal/resources/query-grou
   selector: 'op-wp-table-configuration-settings-tab',
   templateUrl: './display-settings-tab.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WpTableConfigurationDisplaySettingsTabComponent implements TabComponent, OnInit {
   readonly injector = inject(Injector);
@@ -109,7 +106,7 @@ export class WpTableConfigurationDisplaySettingsTabComponent implements TabCompo
       .onReady()
       .then(() => {
         this.availableGroups = sortBy(this.wpTableGroupBy.available, 'name');
-        this.currentGroup = this.wpTableGroupBy.current || this.availableGroups[0];
+        this.currentGroup = this.wpTableGroupBy.current ?? this.availableGroups[0];
         this.cdRef.markForCheck();
       });
   }
