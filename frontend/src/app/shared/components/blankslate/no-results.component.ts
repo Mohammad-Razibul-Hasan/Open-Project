@@ -27,10 +27,12 @@
 
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
+import { DynamicIconName } from 'core-app/shared/components/primer/dynamic-icon-map';
 import {
   BlankslateComponent,
   BlankslateDescriptionComponent,
   BlankslateHeadingComponent,
+  BlankslateHeadingLevel,
   BlankslateIconComponent,
 } from './blankslate.component';
 
@@ -48,6 +50,8 @@ import {
 export class NoResultsComponent {
   private readonly i18n = inject(I18nService);
 
+  readonly icon = input<DynamicIconName>('graph');
   readonly title = input(this.i18n.t('js.label_no_data'));
   readonly message = input<string>();
+  readonly headingLevel = input<BlankslateHeadingLevel>(3);
 }
