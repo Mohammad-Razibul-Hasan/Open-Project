@@ -25,21 +25,21 @@
 // See COPYRIGHT and LICENSE files for more details.
 //++
 
-import { ChangeDetectionStrategy, Component, ContentChild, HostBinding, Input, inject } from '@angular/core';
+import { AfterContentChecked, ChangeDetectionStrategy, Component, ContentChild, HostBinding, Input, inject } from '@angular/core';
 import { AbstractControl, FormGroupDirective, NgControl } from '@angular/forms';
 import { I18nService } from 'core-app/core/i18n/i18n.service';
+
+import { observeFormState } from './observe-form-state';
 
 @Component({
   // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'spot-form-field',
   templateUrl: './form-field.component.html',
   standalone: false,
-  // TODO: This component has been partially migrated to be zoneless-compatible.
-  // After testing, this should be updated to ChangeDetectionStrategy.OnPush.
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SpotFormFieldComponent {
+export class SpotFormFieldComponent implements AfterContentChecked {
+  private readonly observeState = observeFormState();
   private _formGroupDirective = inject(FormGroupDirective, { optional: true });
   readonly I18n = inject(I18nService);
 
@@ -92,13 +92,17 @@ export class SpotFormFieldComponent {
    */
   @Input() hidden = false;
 
-  @ContentChild(NgControl) ngControl:NgControl;
+  @ContentChild(NgControl) ngControl?:NgControl;
 
   internalID = `spot-form-field-${+new Date()}`;
 
   text = {
     invalid: this.I18n.t('js.label_invalid'),
   };
+
+  ngAfterContentChecked():void {
+    this.observeState(this.formControl, this._formGroupDirective?.control);
+  }
 
   get errorsID():string {
     return `${this.internalID}-errors`;
@@ -113,7 +117,7 @@ export class SpotFormFieldComponent {
   }
 
   get formControl():AbstractControl|undefined|null {
-    return this.ngControl?.control || this.control;
+    return this.ngControl?.control ?? this.control;
   }
 
   get showErrorMessage():boolean {
