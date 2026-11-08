@@ -36,7 +36,7 @@ import type AnchoredPositionElement from '@openproject/primer-view-components/ap
 // Side-effect import: the type-only import above is elided, and it is loading
 // the module that registers `<anchored-position>`.
 import '@openproject/primer-view-components/app/components/primer/anchored_position';
-import { fireEvent } from '@testing-library/dom';
+import { fireEvent, waitFor } from '@testing-library/dom';
 import { nextFrame } from 'core-common/testing/timing';
 import { CONTEXTUAL_ALIGN, CONTEXTUAL_SIDE, ContextualActionMenu, PointerReleaseGate } from './contextual-action-menu';
 
@@ -342,6 +342,68 @@ describe('ContextualActionMenu', () => {
       expect(overlay.getAttribute('alignment-offset')).toBe('12');
       expect(overlay.anchorOffset).toBe(8);
       expect(popover.matches(':popover-open')).toBe(true);
+    });
+  });
+
+  describe('fitting the pointer position', () => {
+    const rect = () => overlay.getBoundingClientRect();
+    const expectRect = (check:(r:DOMRect) => void) => waitFor(() => check(rect()));
+
+    it('opens below and to the right of the pointer when it fits', async () => {
+      presenter.openAtPoint(100, 100, card);
+
+      await expectRect((r) => {
+        expect(Math.round(r.left)).toBe(100);
+        expect(Math.round(r.top)).toBe(100);
+      });
+      expect(overlay).toHaveAttribute('allow-out-of-bounds');
+    });
+
+    it('opens above the pointer when the menu does not fit below it', async () => {
+      overlay.style.height = '200px';
+      const y = window.innerHeight - 50;
+
+      presenter.openAtPoint(100, y, card);
+
+      await expectRect((r) => {
+        expect(Math.round(r.left)).toBe(100);
+        expect(Math.round(r.bottom)).toBe(y);
+      });
+    });
+
+    it('opens to the left of the pointer when the menu does not fit to its right', async () => {
+      overlay.style.width = '240px';
+      const x = window.innerWidth - 50;
+
+      presenter.openAtPoint(x, 100, card);
+
+      await expectRect((r) => {
+        expect(Math.round(r.right)).toBe(x);
+        expect(Math.round(r.top)).toBe(100);
+      });
+    });
+
+    it('pins the menu to the viewport bottom when it fits neither below nor above the pointer', async () => {
+      // AP-4: a menu taller than the space on either side of the pointer. Primer would walk to
+      // outside-right and reinterpret the offsets; the menu must stay under the pointer's x.
+      const height = Math.round(window.innerHeight * 0.8);
+      overlay.style.height = `${height}px`;
+
+      presenter.openAtPoint(100, Math.round(window.innerHeight / 2), card);
+
+      await expectRect((r) => {
+        expect(Math.round(r.left)).toBe(100);
+        expect(Math.round(r.bottom)).toBe(window.innerHeight);
+      });
+    });
+
+    it('restores allow-out-of-bounds with the rest of the anchoring when the menu closes', async () => {
+      presenter.openAtPoint(100, 100, card);
+      expect(overlay).toHaveAttribute('allow-out-of-bounds');
+
+      await closeMenu();
+
+      expect(overlay).not.toHaveAttribute('allow-out-of-bounds');
     });
   });
 
