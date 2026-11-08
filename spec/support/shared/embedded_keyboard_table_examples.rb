@@ -134,6 +134,7 @@ RSpec.shared_examples "an embedded keyboard table" do |editable: true, drag_and_
 
     if context_menu_enabled
       expect(page).to have_css("#work-package-context-menu")
+      expect(page).to have_selector(:menuitem, focused: true)
       wp_table.press_keys(:escape)
       expect(page).to have_no_css("#work-package-context-menu")
       wp_table.expect_focus_on_row(rows.first)

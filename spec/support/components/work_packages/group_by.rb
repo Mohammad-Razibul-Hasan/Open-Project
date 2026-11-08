@@ -39,7 +39,7 @@ module Components
         open_table_column_context_menu(name)
 
         within_column_context_menu do
-          click_button("Group by")
+          find(:menuitem, "Group by").click
         end
       end
 
@@ -95,11 +95,11 @@ module Components
       end
 
       def open_table_column_context_menu(name)
-        page.find(".generic-table--sort-header ##{name.downcase}").click
+        page.find(:columnheader, name).click_button(name)
       end
 
       def within_column_context_menu(&)
-        page.within("#column-context-menu", &)
+        page.within(:menu, &)
       end
     end
   end

@@ -238,7 +238,7 @@ module Pages
       row_element = row(work_package)
       row_element.hover
 
-      scroll_to_and_click(row_element.find(".wp-table--details-link"))
+      scroll_to_and_click(row_element.find(:link, accessible_name: I18n.t("js.button_open_details")))
 
       split_page
     end

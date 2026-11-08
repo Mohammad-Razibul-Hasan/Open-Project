@@ -27,8 +27,19 @@
 
 import { InjectionToken } from '@angular/core';
 import type { OPContextMenuService } from 'core-app/shared/components/op-context-menu/op-context-menu.service';
+import type { OpContextMenuHandler } from 'core-app/shared/components/op-context-menu/op-context-menu-handler';
+import type { DynamicIconName } from 'core-app/shared/components/primer/dynamic-icon-map';
 
 export type OpContextMenuCloseReason = 'escape'|'action'|'outside'|'scroll';
+
+/** What the Primer action menu needs from a handler: its items and where focus goes afterwards. */
+export type OpActionMenuHost = Pick<OpContextMenuHandler, 'locals'|'onClose'>;
+
+export interface OpActionMenuOptions {
+  /** The element the menu anchors on; without it a pointer event's position is used. */
+  anchor?:HTMLElement;
+  align?:'start'|'end';
+}
 
 export const OpContextMenuLocalsToken = new InjectionToken<OpContextMenuLocalsMap>('CONTEXT_MENU_LOCALS');
 
@@ -36,6 +47,8 @@ export interface OpContextMenuItem {
   disabled?:boolean;
   hidden?:boolean;
   icon?:string;
+  /** Octicon name, rendered instead of the legacy `icon` class. */
+  octicon?:DynamicIconName;
   href?:string;
   class?:string;
   ariaLabel?:string;
@@ -44,6 +57,10 @@ export interface OpContextMenuItem {
   divider?:boolean;
   isHeader?:boolean;
   onClick?:(event:MouseEvent) => boolean;
+  /** Items of a submenu; the item itself then only opens it. */
+  children?:OpContextMenuItem[];
+  /** Renders the item as a `menuitemcheckbox` with this checked state. */
+  checked?:boolean;
 }
 
 export interface OpContextMenuLocalsMap {
