@@ -35,7 +35,7 @@ jobs:
       DOCKER_BUILDKIT: 1
       CI_RETRY_COUNT: 3
     steps:
-    - uses: runs-on/action@17b59092eb37ebfdbb034460892887c09100eaa3 # v2.5.0
+    - uses: runs-on/action@13fbb6a39310a0dac9ab4716da2c4e74a3326dfc # v2.7.0
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
